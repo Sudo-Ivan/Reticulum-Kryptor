@@ -28,8 +28,14 @@ import time
 import math
 import RNS
 
-from able import BluetoothDispatcher, GATT_SUCCESS
-from able.adapter import require_bluetooth_enabled
+try:
+    from able import BluetoothDispatcher, GATT_SUCCESS
+except Exception as e:
+    GATT_SUCCESS = 0x00
+    class BluetoothDispatcher():
+        def __init__(**kwargs):
+            RNS.log("Attempt to initialise BLE connectivity, but Android BLE support library is unavailable", RNS.LOG_ERROR)
+            raise OSError("No BLE support available")
 
 class KISS():
     FEND            = 0xC0
@@ -81,11 +87,14 @@ class KISS():
     ERROR_INITRADIO     = 0x01
     ERROR_TXFAILED      = 0x02
     ERROR_EEPROM_LOCKED = 0x03
+    ERROR_QUEUE_FULL    = 0x04
+    ERROR_MEMORY_LOW    = 0x05
     ERROR_INVALID_FIRMWARE = 0x10
     ERROR_INVALID_BLE_MTU  = 0x20
 
     PLATFORM_AVR   = 0x90
     PLATFORM_ESP32 = 0x80
+    PLATFORM_NRF52 = 0x70
 
     @staticmethod
     def escape(data):
@@ -652,7 +661,7 @@ class RNodeInterface(Interface):
         if not self.detected:
             raise IOError("Could not detect device")
         else:
-            if self.platform == KISS.PLATFORM_ESP32:
+            if self.platform == KISS.PLATFORM_ESP32 or self.platform == KISS.PLATFORM_NRF52:
                 self.display = True
 
         if not self.firmware_ok:
@@ -1242,6 +1251,9 @@ class RNodeInterface(Interface):
                             elif (byte == KISS.ERROR_TXFAILED):
                                 RNS.log(str(self)+" hardware TX error (code "+RNS.hexrep(byte)+")", RNS.LOG_ERROR)
                                 raise IOError("Hardware transmit failure")
+                            elif (byte == KISS.ERROR_MEMORY_LOW):
+                                RNS.log(str(self)+" hardware error (code "+RNS.hexrep(byte)+"): Memory exhausted", RNS.LOG_ERROR)
+                                self.hw_errors.append({"error": KISS.ERROR_MEMORY_LOW, "description": "Memory exhausted on connected device"})
                             else:
                                 RNS.log(str(self)+" hardware error (code "+RNS.hexrep(byte)+")", RNS.LOG_ERROR)
                                 raise IOError("Unknown hardware failure")
