@@ -78,9 +78,12 @@ class KISS():
     ERROR_INITRADIO     = 0x01
     ERROR_TXFAILED      = 0x02
     ERROR_EEPROM_LOCKED = 0x03
+    ERROR_QUEUE_FULL    = 0x04
+    ERROR_MEMORY_LOW    = 0x05
 
     PLATFORM_AVR   = 0x90
     PLATFORM_ESP32 = 0x80
+    PLATFORM_NRF52 = 0x70
 
     @staticmethod
     def escape(data):
@@ -326,7 +329,7 @@ class RNodeInterface(Interface):
             RNS.log("Could not detect device for "+str(self), RNS.LOG_ERROR)
             self.serial.close()
         else:
-            if self.platform == KISS.PLATFORM_ESP32:
+            if self.platform == KISS.PLATFORM_ESP32 or self.platform == KISS.PLATFORM_NRF52:
                 self.display = True
 
         RNS.log("Serial port "+self.port+" is now open")
@@ -491,9 +494,12 @@ class RNodeInterface(Interface):
             raise IOError("An IO error occurred while configuring radio state for "+str(self))
 
     def validate_firmware(self):
-        if (self.maj_version >= RNodeInterface.REQUIRED_FW_VER_MAJ):
-            if (self.min_version >= RNodeInterface.REQUIRED_FW_VER_MIN):
-                self.firmware_ok = True
+        if (self.maj_version > RNodeInterface.REQUIRED_FW_VER_MAJ):
+            self.firmware_ok = True
+        else:
+            if (self.maj_version >= RNodeInterface.REQUIRED_FW_VER_MAJ):
+                if (self.min_version >= RNodeInterface.REQUIRED_FW_VER_MIN):
+                    self.firmware_ok = True
         
         if self.firmware_ok:
             return
@@ -841,6 +847,9 @@ class RNodeInterface(Interface):
                             elif (byte == KISS.ERROR_TXFAILED):
                                 RNS.log(str(self)+" hardware TX error (code "+RNS.hexrep(byte)+")", RNS.LOG_ERROR)
                                 raise IOError("Hardware transmit failure")
+                            elif (byte == KISS.ERROR_MEMORY_LOW):
+                                RNS.log(str(self)+" hardware error (code "+RNS.hexrep(byte)+"): Memory exhausted", RNS.LOG_ERROR)
+                                self.hw_errors.append({"error": KISS.ERROR_MEMORY_LOW, "description": "Memory exhausted on connected device"})
                             else:
                                 RNS.log(str(self)+" hardware error (code "+RNS.hexrep(byte)+")", RNS.LOG_ERROR)
                                 raise IOError("Unknown hardware failure")
