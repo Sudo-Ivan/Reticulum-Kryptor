@@ -13,13 +13,27 @@
 
 import os
 import time
+import serial
 
 P = 2 ** 255 - 19
 _A = 486662
 
+class KryptorHSM:
+    def __init__(self):
+        self.serial = serial.Serial('/dev/ttyUSB0', 115200)
+    
+    def generate_keypair(self):
+        self.serial.write(b'GENERATE_KEYPAIR')
+        return self.serial.read(64)
+    
+    def ecdh_exchange(self, private_key, peer_public_key):
+        command = b'ECDH_EXCHANGE' + private_key + peer_public_key
+        self.serial.write(command)
+        return self.serial.read(32)
+
+kryptor_hsm = KryptorHSM()
 
 def _point_add(point_n, point_m, point_diff):
-    """Given the projection of two points and their difference, return their sum"""
     (xn, zn) = point_n
     (xm, zm) = point_m
     (x_diff, z_diff) = point_diff
@@ -27,9 +41,7 @@ def _point_add(point_n, point_m, point_diff):
     z = (x_diff << 2) * (xm * zn - zm * xn) ** 2
     return x % P, z % P
 
-
 def _point_double(point_n):
-    """Double a point provided in projective coordinates"""
     (xn, zn) = point_n
     xn2 = xn ** 2
     zn2 = zn ** 2
@@ -38,16 +50,12 @@ def _point_double(point_n):
     z = 4 * xzn * (xn2 + _A * xzn + zn2)
     return x % P, z % P
 
-
 def _const_time_swap(a, b, swap):
-    """Swap two values in constant time"""
     index = int(swap) * 2
     temp = (a, b, b, a)
     return temp[index:index+2]
 
-
 def _raw_curve25519(base, n):
-    """Raise the point base to the power n"""
     zero = (1, 0)
     one = (base, 1)
     mP, m1P = zero, one
@@ -62,39 +70,28 @@ def _raw_curve25519(base, n):
     inv_z = pow(z, P - 2, P)
     return (x * inv_z) % P
 
-
 def _unpack_number(s):
-    """Unpack 32 bytes to a 256 bit value"""
     if len(s) != 32:
         raise ValueError('Curve25519 values must be 32 bytes')
     return int.from_bytes(s, "little")
 
-
 def _pack_number(n):
-    """Pack a value into 32 bytes"""
     return n.to_bytes(32, "little")
 
-
 def _fix_secret(n):
-    """Mask a value to be an acceptable exponent"""
     n &= ~7
     n &= ~(128 << 8 * 31)
     n |= 64 << 8 * 31
     return n
 
-
 def curve25519(base_point_raw, secret_raw):
-    """Raise the base point to a given power"""
     base_point = _unpack_number(base_point_raw)
     secret = _fix_secret(_unpack_number(secret_raw))
     return _pack_number(_raw_curve25519(base_point, secret))
 
-
 def curve25519_base(secret_raw):
-    """Raise the generator point to a given power"""
     secret = _fix_secret(_unpack_number(secret_raw))
     return _pack_number(_raw_curve25519(9, secret))
-
 
 class X25519PublicKey:
     def __init__(self, x):
@@ -102,11 +99,10 @@ class X25519PublicKey:
 
     @classmethod
     def from_public_bytes(cls, data):
-        return cls(_unpack_number(data))
+        return cls(data)
 
     def public_bytes(self):
-        return _pack_number(self.x)
-
+        return self.x
 
 class X25519PrivateKey:
     MIN_EXEC_TIME = 0.002
@@ -121,25 +117,27 @@ class X25519PrivateKey:
 
     @classmethod
     def generate(cls):
-        return cls.from_private_bytes(os.urandom(32))
+        private_key, public_key = kryptor_hsm.generate_keypair()
+        return cls(private_key)
 
     @classmethod
     def from_private_bytes(cls, data):
-        return cls(_fix_secret(_unpack_number(data)))
+        return cls(data)
 
     def private_bytes(self):
-        return _pack_number(self.a)
+        return self.a
 
     def public_key(self):
-        return X25519PublicKey.from_public_bytes(_pack_number(_raw_curve25519(9, self.a)))
+        _, public_key = kryptor_hsm.generate_keypair()
+        return X25519PublicKey(public_key)
 
     def exchange(self, peer_public_key):
         if isinstance(peer_public_key, bytes):
             peer_public_key = X25519PublicKey.from_public_bytes(peer_public_key)
-
+        
         start = time.time()
         
-        shared = _pack_number(_raw_curve25519(peer_public_key.x, self.a))
+        shared = kryptor_hsm.ecdh_exchange(self.a, peer_public_key.x)
         
         end = time.time()
         duration = end-start

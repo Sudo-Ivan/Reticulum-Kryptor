@@ -22,47 +22,62 @@
 
 import RNS.Cryptography.Provider as cp
 import RNS.vendor.platformutils as pu
+import serial
 
 if cp.PROVIDER == cp.PROVIDER_INTERNAL:
     from .aes import AES
-    
 elif cp.PROVIDER == cp.PROVIDER_PYCA:
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-
     if pu.cryptography_old_api():
         from cryptography.hazmat.backends import default_backend
 
+class KryptorHSM:
+    def __init__(self):
+        self.serial = serial.Serial('/dev/ttyUSB0', 115200)
+    
+    def camellia_encrypt(self, plaintext, key, iv):
+        command = b'CAMELLIA_ENCRYPT' + key + iv + plaintext
+        self.serial.write(command)
+        return self.serial.read(len(plaintext))
+    
+    def camellia_decrypt(self, ciphertext, key, iv):
+        command = b'CAMELLIA_DECRYPT' + key + iv + ciphertext
+        self.serial.write(command)
+        return self.serial.read(len(ciphertext))
+
+kryptor_hsm = KryptorHSM()
 
 class AES_128_CBC:
-
     @staticmethod
     def encrypt(plaintext, key, iv):
-        if cp.PROVIDER == cp.PROVIDER_INTERNAL:
-            cipher = AES(key)
-            return cipher.encrypt(plaintext, iv)
-
-        elif cp.PROVIDER == cp.PROVIDER_PYCA:
-            if not pu.cryptography_old_api():
-                cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
-            else:
-                cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
-            
-            encryptor = cipher.encryptor()
-            ciphertext = encryptor.update(plaintext) + encryptor.finalize()
-            return ciphertext
+        try:
+            return kryptor_hsm.camellia_encrypt(plaintext, key, iv)
+        except Exception as e:
+            print(f"Hardware encryption failed: {e}. Falling back to software.")
+            if cp.PROVIDER == cp.PROVIDER_INTERNAL:
+                cipher = AES(key)
+                return cipher.encrypt(plaintext, iv)
+            elif cp.PROVIDER == cp.PROVIDER_PYCA:
+                if not pu.cryptography_old_api():
+                    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+                else:
+                    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+                encryptor = cipher.encryptor()
+                return encryptor.update(plaintext) + encryptor.finalize()
 
     @staticmethod
     def decrypt(ciphertext, key, iv):
-        if cp.PROVIDER == cp.PROVIDER_INTERNAL:
-            cipher = AES(key)
-            return cipher.decrypt(ciphertext, iv)
-
-        elif cp.PROVIDER == cp.PROVIDER_PYCA:
-            if not pu.cryptography_old_api():
-                cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
-            else:
-                cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
-
-            decryptor = cipher.decryptor()
-            plaintext = decryptor.update(ciphertext) + decryptor.finalize()
-            return plaintext
+        try:
+            return kryptor_hsm.camellia_decrypt(ciphertext, key, iv)
+        except Exception as e:
+            print(f"Hardware decryption failed: {e}. Falling back to software.")
+            if cp.PROVIDER == cp.PROVIDER_INTERNAL:
+                cipher = AES(key)
+                return cipher.decrypt(ciphertext, iv)
+            elif cp.PROVIDER == cp.PROVIDER_PYCA:
+                if not pu.cryptography_old_api():
+                    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+                else:
+                    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+                decryptor = cipher.decryptor()
+                return decryptor.update(ciphertext) + decryptor.finalize()
