@@ -29,6 +29,7 @@ if get_platform() == "android":
     from .Interfaces import TCPInterface
     from .Interfaces import UDPInterface
     from .Interfaces import I2PInterface
+    from .Interfaces import RNodeMultiInterface
     from .Interfaces.Android import RNodeInterface
     from .Interfaces.Android import SerialInterface
     from .Interfaces.Android import KISSInterface
@@ -1327,7 +1328,7 @@ class Reticulum:
 
                 if hasattr(interface, "r_battery_state"):
                     if interface.r_battery_state != 0x00:
-                        ifstats["battery_state"] = interface.r_battery_state
+                        ifstats["battery_state"] = interface.get_battery_state_string()
 
                     if hasattr(interface, "r_battery_percent"):
                         ifstats["battery_percent"] = interface.r_battery_percent

@@ -1,6 +1,67 @@
+### 2024-10-11: RNS β 0.8.4
+
+This release fixes a number of bugs and improves reliability of automatic reconnection when BLE-connected RNodes unexpectedly disappear or lose connection.
+
+**Changes**
+- Improved RNode BLE reconnection realiability
+- Added RNode battery state to `rnstatus` output
+- Fixed resource transfer hanging for a long time over slow links if proof packet is lost
+- Fixed missing import on Android
+
+**Release Hashes**
+```
+d3f7a9fddc6c1e59b1e4895756fe602408ac6ef09de377ee65ec62d09fff97a3 dist/rns-0.8.4-py3-none-any.whl
+eb3843bcab1428be0adb097988991229a4c03156ab40cc9c6e2d9c590d8b850b dist/rnspure-0.8.4-py3-none-any.whl
+```
+
+### 2024-10-10: RNS β 0.8.3
+
+This release fixes a bug in resource transfer progress calculation, improves RNode error handling, and brings minor improvements to the `rncp` utility.
+
+**Changes**
+- Fixed a bug in resource transfer progress calculations
+- Added physical layer transfer rate output option to `rncp`
+- Added save directory option to `rncp`
+- Improved path handling for the fetch-jail option of of `rncp`
+- Added error detection for modem communication timeouts on connected RNode devices
+
+**Release Hashes**
+```
+54ddab32769081045db5fe45b27492cc012bf2fad64bc65ed37011f3651469fb rns-0.8.3-py3-none-any.whl
+a04915111d65b05a5f2ef2687ed208813034196c0c5e711cb01e6db72faa23ef rnspure-0.8.3-py3-none-any.whl
+```
+
+### 2024-10-06: RNS β 0.8.2
+
+This release adds several new boards to `rnodeconf`, fixes a range of bugs and improves transport reliability.
+
+Thanks to @jacobeva, @prusnak and @deavmi who contributed to this release!
+
+**Changes**
+- Added support for T-Beam Supreme devices to `rnodeconf`
+- Added support for T3S3 devices to `rnodeconf`
+- Added support for T-Deck devices to `rnodeconf`
+- Added support for new hardware error codes from connected RNodes
+- Added the ability to control the display on nRF52-based RNodes
+- Improved resource transfers over very slow links, by adding more suitable `MAX_WINDOW` cap if link speed is continously below threshold.
+- Improved `rnodeconf` flashing so manual resets for some devices are no longer required
+- Added edge case handling for receiving a link proof after the link had timed out and been closed, but before it having been purged from active links table
+- Updated supported hardware section of the manual with new boards
+- Tuned path request timing for roaming instances
+- Fixed a bug that caused RNS to fail to initialise in Termux on Android
+- Fixed a bug in RNodeInterface firmware version comparison
+- Fixed a bug in the serial framing of RNodeMultiInterface
+- Fixed a bug in sub-interface spawning of RNodeMultiInterface
+
+**Release Hashes**
+```
+db720a727a09c0c9d76288dec5a995a30146e65d6a4c5c034f47fb60a78f4962 rns-0.8.2-py3-none-any.whl
+ee412535edba48817551658247fb0c843d17e1c97cad9d2a819a7fc627c5ba28 rnspure-0.8.2-py3-none-any.whl
+```
+
 ### 2024-10-02: RNS β 0.8.1
 
-This release add BLE support to RNodeInterface, and support for configuring additional options to `rnodeconf`.
+This release adds BLE support to RNodeInterface, and support for configuring additional options to `rnodeconf`.
 
 **Changes**
 - Added Bluetooth Low Energy support to RNodeInterface
